@@ -1,0 +1,29 @@
+import {it,expect} from 'vitest';
+import ExcelJS from 'exceljs';
+import {parseFiles,proposeMapping,prepareImport} from '../src/server/importer';
+it('preserva CSV, expõe cabeçalhos duplicados e nunca junta abas',async()=>{
+ const d=await parseFiles([{originalname:'clientes.csv',buffer:Buffer.from('Código;Nome;Nome\n001;Ana;Silva\n002;João;Souza')}]);
+ expect(d.sheets[0].rows[1][0].value).toBe('001');
+ expect(d.sheets[0].warnings.join(' ')).toContain('duplicado');
+ expect(d.mappings[0].fields.map(f=>f.id)).toEqual(['c1','c2','c3']);
+});
+it('detecta título antes do cabeçalho e fórmulas somente leitura',async()=>{
+ const book=new ExcelJS.Workbook();const ws=book.addWorksheet('Estoque');
+ ws.addRow(['Inventário']);ws.addRow(['Código','Produto','Quantidade']);ws.addRow(['001','Café',{formula:'1+1',result:2}]);
+ book.addWorksheet('Resumo').addRows([['Total'],[2]]);
+ const d=await parseFiles([{originalname:'estoque.xlsx',buffer:Buffer.from(await book.xlsx.writeBuffer())}]);
+ expect(d.sheets).toHaveLength(2);expect(d.mappings[0].headerRow).toBe(2);
+ expect(d.mappings[0].fields[2].readonly).toBe(true);
+ expect(d.mappings[1].role).toBe('report');
+});
+it('bloqueia chave duplicada e relações sem correspondência',async()=>{
+ const d=await parseFiles([{originalname:'a.csv',buffer:Buffer.from('ID,Nome\n001,A\n001,B')}]);
+ d.mappings[0].keyField='c1';
+ expect(()=>prepareImport(d,{name:'A',description:'',locale:'pt-BR',acknowledged:true,mappings:d.mappings})).toThrow(/duplicad/);
+});
+it('permite corrigir região sem descartar dados fora dela silenciosamente',async()=>{
+ const d=await parseFiles([{originalname:'a.csv',buffer:Buffer.from('Título\nID,Nome\n01,A')}]);
+ const m=proposeMapping(d.sheets[0],2);
+ expect(m.fields.map(f=>f.label)).toEqual(['ID','Nome']);
+ expect(m.headerRow).toBe(2);
+});
