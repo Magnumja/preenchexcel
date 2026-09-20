@@ -5,6 +5,8 @@ import { imports, projects, datasets, records, revisions, links } from './schema
 import type { Confirmation, Value } from '../shared/contracts';
 import { AppError } from './values';
 import { prepareImport } from './importer';
+import { loadExisting, planReconcile, applyReconcile } from './reconcile';
+import { syncMappingFor } from './sync';
 import { workspaceAccess } from './access';
 export async function publish(userId: string, batchId: string, config: Confirmation) {
   const [batch] = await db.select().from(imports).where(eq(imports.id, batchId));
@@ -22,7 +24,8 @@ export async function publish(userId: string, batchId: string, config: Confirmat
     }
     if (!locked.diagnosis || Date.now() - locked.createdAt.getTime() > 86400000)
       throw new AppError(410, 'Rascunho expirado. Importe o arquivo novamente.');
-    const prepared = prepareImport(locked.diagnosis, config);
+    const existing = await loadExisting(tx, config, batch.workspaceId);
+    const prepared = prepareImport(locked.diagnosis, config, existing);
     let projectId = config.projectId;
     if (projectId) {
       const [p] = await tx
@@ -41,9 +44,24 @@ export async function publish(userId: string, batchId: string, config: Confirmat
         .returning();
       projectId = p.id;
     }
-    const datasetIds = new Map(prepared.map((p) => [p.mapping.sheetId, randomUUID()]));
+    // Abas que atualizam conjuntos existentes seguem pela reconciliação; as demais criam conjuntos.
+    for (const p of prepared.filter((p) => p.existing)) {
+      const plan = await planReconcile(tx, p.existing!, p.mapping, p.rows);
+      await applyReconcile(tx, userId, p.existing!, p, plan);
+      if (locked.sourceUrl)
+        await tx
+          .update(datasets)
+          .set({
+            sourceUrl: locked.sourceUrl,
+            syncMapping: syncMappingFor(p.mapping, p.existing!.id),
+            syncState: { ...(p.existing as { syncState?: { userId: string } }).syncState, userId },
+          })
+          .where(eq(datasets.id, p.existing!.id));
+    }
+    const creating = prepared.filter((p) => !p.existing);
+    const datasetIds = new Map(creating.map((p) => [p.mapping.sheetId, randomUUID()]));
     const ids = new Map<string, string>();
-    const planned = prepared.map((p) => ({
+    const planned = creating.map((p) => ({
       ...p,
       rows: p.rows.map((r) => {
         const id = randomUUID();
@@ -59,17 +77,20 @@ export async function publish(userId: string, batchId: string, config: Confirmat
             ? { ...f.reference, sheetId: datasetIds.get(f.reference.sheetId)! }
             : undefined,
       }));
-      await tx
-        .insert(datasets)
-        .values({
-          id: datasetIds.get(p.mapping.sheetId),
-          projectId: projectId!,
-          name: p.mapping.name,
-          role: p.mapping.role,
-          fields,
-          keyField: p.mapping.keyField,
-          titleField: p.mapping.titleField,
-        });
+      await tx.insert(datasets).values({
+        id: datasetIds.get(p.mapping.sheetId),
+        projectId: projectId!,
+        name: p.mapping.name,
+        role: p.mapping.role,
+        fields,
+        keyField: p.mapping.keyField,
+        titleField: p.mapping.titleField,
+        sourceUrl: locked.sourceUrl,
+        syncMapping: locked.sourceUrl
+          ? syncMappingFor(p.mapping, datasetIds.get(p.mapping.sheetId)!)
+          : null,
+        syncState: locked.sourceUrl ? { userId } : null,
+      });
     }
     const pendingLinks: { recordId: string; fieldId: string; targetId: string }[] = [];
     for (const p of planned) {
@@ -100,17 +121,15 @@ export async function publish(userId: string, batchId: string, config: Confirmat
       for (let i = 0; i < items.length; i += 200) {
         const chunk = items.slice(i, i + 200);
         await tx.insert(records).values(chunk);
-        await tx
-          .insert(revisions)
-          .values(
-            chunk.map((r) => ({
-              recordId: r.id,
-              authorId: userId,
-              version: 1,
-              before: null,
-              after: r.values,
-            })),
-          );
+        await tx.insert(revisions).values(
+          chunk.map((r) => ({
+            recordId: r.id,
+            authorId: userId,
+            version: 1,
+            before: null,
+            after: r.values,
+          })),
+        );
       }
     }
     for (let i = 0; i < pendingLinks.length; i += 200)
