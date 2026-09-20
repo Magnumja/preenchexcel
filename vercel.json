@@ -1,5 +1,4 @@
 {
-  "$comment": "Opcional: hospedar só o cliente na Vercel e encaminhar /api ao Render. Neste caso APP_ORIGIN e BETTER_AUTH_URL no Render devem ser o domínio da Vercel. Build: npm run build; output: dist/client.",
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://SEU-SERVICO.onrender.com/api/:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
