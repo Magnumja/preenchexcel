@@ -1,0 +1,32 @@
+# Blueprint do Render: um serviço Node serve API e cliente. Banco: Neon (DATABASE_URL) ou o
+# Postgres do Render abaixo. Defina os segredos no painel; nada sensível fica neste arquivo.
+services:
+  - type: web
+    name: preenche
+    runtime: node
+    plan: starter
+    region: oregon
+    # NODE_ENV=production faria o npm pular as devDependencies (vite, tsx); --include=dev garante o build.
+    buildCommand: npm ci --include=dev && npm run build
+    preDeployCommand: npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '22'
+      - key: PORT
+        value: '10000'
+      - key: SYNC_INTERVAL_MINUTES
+        value: '15'
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      # URL pública do serviço (ex.: https://preenche.onrender.com), sem barra no final.
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      # Neon: string de conexão com sslmode=require (ou fromDatabase para o Postgres do Render).
+      - key: DATABASE_URL
+        sync: false
