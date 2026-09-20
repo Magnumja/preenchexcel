@@ -119,6 +119,8 @@ export interface Dataset {
   sourceUrl?: string | null;
   syncEnabled?: boolean;
   syncState?: SyncState | null;
+  /** Nome original da aba de origem, quando o conjunto veio de um link. */
+  sourceSheet?: string | null;
 }
 export interface DataRecord {
   id: string;

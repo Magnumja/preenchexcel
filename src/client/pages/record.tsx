@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useBlocker, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { History, Save, LockKeyhole, Check, FileSpreadsheet, ExternalLink } from 'lucide-react';
-import { api, display } from '../api';
+import { api, display, formatValue } from '../api';
 import { ErrorNotice, Loading, Modal } from '../ui';
 import { useWorkspace, usePageContext } from '../shell';
 import { FieldInput } from '../fields';
@@ -354,7 +354,8 @@ function HistoryList({ record, dataset }: { record: DataRecord; dataset: Dataset
                       <div key={f.id}>
                         <dt>{f.label}</dt>
                         <dd>
-                          <del>{display(r.before?.[f.id])}</del> → {display(r.after[f.id])}
+                          <del>{formatValue(r.before?.[f.id], f)}</del> →{' '}
+                          {formatValue(r.after[f.id], f)}
                         </dd>
                       </div>
                     ))}

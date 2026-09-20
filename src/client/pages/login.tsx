@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Check } from 'lucide-react';
-import { post } from '../api';
+import { post, ApiError } from '../api';
+const messages: Record<string, string> = {
+  INVALID_EMAIL_OR_PASSWORD: 'E-mail ou senha incorretos.',
+  USER_ALREADY_EXISTS: 'Já existe uma conta com este e-mail. Entre com ela.',
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: 'Já existe uma conta com este e-mail. Entre com ela.',
+  PASSWORD_TOO_SHORT: 'A senha precisa ter pelo menos 10 caracteres.',
+  INVALID_EMAIL: 'Informe um e-mail válido.',
+};
 import { Brand } from '../shell';
 import { ErrorNotice } from '../ui';
 export function Login() {
@@ -25,7 +32,11 @@ export function Login() {
       cache.clear();
       navigate('/');
     } catch (e) {
-      setError(e);
+      setError(
+        e instanceof ApiError && messages[e.code]
+          ? new ApiError(messages[e.code], e.status, e.code)
+          : e,
+      );
     } finally {
       setBusy(false);
     }

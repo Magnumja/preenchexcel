@@ -315,6 +315,21 @@ export function FieldsReview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
   function changeField(id: string, patch: Partial<Field>) {
+    // Ao virar seleção, as opções partem dos valores distintos da coluna (ainda editáveis).
+    if (
+      (patch.type === 'select' || patch.type === 'multiselect') &&
+      !m.fields.find((f) => f.id === id)?.options.length &&
+      sheet
+    ) {
+      const col = Number(id.slice(1)) - 1;
+      const seen = new Set<string>();
+      for (const row of sheet.rows.slice(m.headerRow, m.endRow))
+        for (const part of String(row[col]?.value ?? '').split(
+          patch.type === 'multiselect' ? ';' : '\u0000',
+        ))
+          if (part.trim()) seen.add(part.trim());
+      patch = { ...patch, options: [...seen].slice(0, 200) };
+    }
     onChange({ ...m, fields: m.fields.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
   }
   function jump(fieldId: string | null) {

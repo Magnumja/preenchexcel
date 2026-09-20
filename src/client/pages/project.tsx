@@ -12,7 +12,7 @@ import {
   Columns3,
   RefreshCw,
 } from 'lucide-react';
-import { api, display } from '../api';
+import { api, display, formatValue } from '../api';
 import { ErrorNotice, Loading, Empty } from '../ui';
 import { useWorkspace, usePageContext } from '../shell';
 import type { Dataset, DataRecord, Project } from '../../shared/contracts';
@@ -180,7 +180,7 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
   const cell = (r: DataRecord, f: (typeof columns)[number]) =>
     f.type === 'reference' && r.values[f.id]
       ? (query.data?.references[String(r.values[f.id])] ?? 'Registro relacionado')
-      : display(r.values[f.id]);
+      : formatValue(r.values[f.id], f);
   return (
     <section className="records-section">
       <div className="section-toolbar">
@@ -368,7 +368,7 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
                       <td key={f.id}>
                         {i === 0 ? (
                           <Link to={`/registros/${r.id}`} className="record-title">
-                            {display(r.values[f.id])}
+                            {formatValue(r.values[f.id], f)}
                           </Link>
                         ) : f.type === 'reference' && r.values[f.id] ? (
                           <Link to={`/registros/${r.values[f.id]}`}>{cell(r, f)}</Link>
@@ -378,7 +378,7 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
                               f.type === 'boolean' || f.type === 'select' ? 'value-tag' : ''
                             }
                           >
-                            {display(r.values[f.id])}
+                            {formatValue(r.values[f.id], f)}
                           </span>
                         )}
                       </td>

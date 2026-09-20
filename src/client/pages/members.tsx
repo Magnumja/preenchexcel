@@ -5,7 +5,7 @@ import { api, post } from '../api';
 import { useWorkspace, usePageContext } from '../shell';
 import { ErrorNotice, Loading } from '../ui';
 export function MembersPage() {
-  const { workspace } = useWorkspace(),
+  const { workspace, user } = useWorkspace(),
     cache = useQueryClient();
   usePageContext([{ label: 'Equipe e acesso' }]);
   const [error, setError] = useState<unknown>(),
@@ -66,6 +66,31 @@ export function MembersPage() {
                 <span className="badge">
                   {{ owner: 'Proprietário', editor: 'Editor', viewer: 'Leitor' }[m.role]}
                 </span>
+                {workspace?.role === 'owner' && m.role !== 'owner' && m.id !== user.id && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-label={`Remover ${m.name}`}
+                    onClick={async () => {
+                      if (!window.confirm(`Remover ${m.name} deste espaço?`)) return;
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        await api(`/workspaces/${workspace.id}/members/${m.id}`, {
+                          method: 'DELETE',
+                        });
+                        await cache.invalidateQueries({ queryKey: ['members'] });
+                        setSuccess('Acesso removido.');
+                      } catch (e) {
+                        setError(e);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Remover
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { api, display } from './api';
+import { api, display, formatValue } from './api';
 import type { Field, Value, DataRecord } from '../shared/contracts';
 export function FieldInput({
   field,
@@ -31,7 +31,7 @@ export function FieldInput({
       {f.readonly ? (
         <>
           <output id={`field-${f.id}`} className="readonly">
-            {display(value)}
+            {formatValue(value, f)}
           </output>
           <small id={`hint-${f.id}`}>Somente leitura · valor do arquivo, sem recálculo</small>
         </>

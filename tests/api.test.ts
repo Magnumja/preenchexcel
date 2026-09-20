@@ -169,8 +169,27 @@ it('isola espaços, publica sem duplicar e salva com histórico/concorrência', 
         .send({ url: 'https://docs.google.com/spreadsheets/d/1234567890abcdefghijklmnop/edit' })
     ).status,
   ).toBe(403);
+  // Remoção de membro: só proprietário; o próprio proprietário não sai.
+  expect(
+    (await b.delete(`/api/workspaces/${wid}/members/${bid}`).set('Origin', origin)).status,
+  ).toBe(403);
+  const me = (await a.get('/api/me')).body.id;
+  expect(
+    (await a.delete(`/api/workspaces/${wid}/members/${me}`).set('Origin', origin)).status,
+  ).toBe(422);
+  expect(
+    (await a.delete(`/api/workspaces/${wid}/members/${bid}`).set('Origin', origin)).status,
+  ).toBe(204);
+  expect((await b.get(`/api/records/${rec.id}`)).status).toBe(404);
   const exported = await a.get(`/api/datasets/${ds}/export`);
   expect(exported.text).toContain('"001","Café","5"');
+  // Exclusão do projeto apaga registros, histórico e vínculos; lote fica sem projeto.
+  expect(
+    (await a.delete(`/api/projects/${first.body.projectId}`).set('Origin', origin)).status,
+  ).toBe(204);
+  expect((await a.get(`/api/projects/${first.body.projectId}`)).status).toBe(404);
+  expect((await a.get(`/api/records/${rec.id}`)).status).toBe(404);
+  expect((await a.get(`/api/workspaces/${wid}/projects`)).body).toEqual([]);
   await a.post('/api/auth/sign-out').set('Origin', origin).send({});
   expect((await a.get(`/api/records/${rec.id}`)).status).toBe(401);
 });

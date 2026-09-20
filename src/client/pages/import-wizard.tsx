@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   AlertTriangle,
 } from 'lucide-react';
-import { api, post, display, ApiError } from '../api';
+import { api, post, formatValue, ApiError } from '../api';
 import { ErrorNotice } from '../ui';
 import { useWorkspace, usePageContext } from '../shell';
 import { StructureReview, FieldsReview, proposeTargets, type Issue } from './import-review';
@@ -80,7 +80,9 @@ export function ImportWizard() {
     // Atualização a partir do link do conjunto: a aba de mesmo nome (ou a única) recebe o destino.
     setMappings(
       b.diagnosis.mappings.map((m, i, all) =>
-        target && (m.name === target.name || all.length === 1) ? proposeTargets(m, target) : m,
+        target && (m.name === (target.sourceSheet ?? target.name) || all.length === 1)
+          ? proposeTargets(m, target)
+          : m,
       ),
     );
   }
@@ -436,7 +438,7 @@ export function ImportWizard() {
                             {f.label}
                             {f.readonly ? ' · só leitura' : ''}
                           </dt>
-                          <dd>{display(row[f.id])}</dd>
+                          <dd>{formatValue(row[f.id], f)}</dd>
                         </div>
                       ))}
                     </dl>

@@ -2824,3 +2824,17 @@ dialog p {
   align-items: center;
   gap: 8px;
 }
+button.danger {
+  color: #8f2f12;
+  border-color: #e3b8a6;
+}
+button.danger:hover {
+  background: #fff2ee;
+  border-color: #c9704f;
+}
+.danger-zone {
+  border-color: #efd5ca;
+}
+.member-list li > button {
+  margin-left: auto;
+}

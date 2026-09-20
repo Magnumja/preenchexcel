@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, FileSpreadsheet, RefreshCw, Link2 } from 'lucide-react';
 import { api } from '../api';
@@ -21,7 +21,10 @@ const roleLabel: Record<string, string> = {
 };
 export function ProjectSettingsPage() {
   const { projectId } = useParams(),
-    { canEdit } = useWorkspace();
+    { canEdit, workspace } = useWorkspace(),
+    navigate = useNavigate(),
+    cache = useQueryClient();
+  const [deleteError, setDeleteError] = useState<unknown>();
   const project = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api<Project & { datasets: Dataset[] }>(`/projects/${projectId}`),
@@ -100,6 +103,42 @@ export function ProjectSettingsPage() {
           conjunto como destino: os registros são reconhecidos pela chave externa e nada é apagado.
         </p>
       </section>
+      {workspace?.role === 'owner' && (
+        <section className="panel danger-zone">
+          <div className="panel-heading">
+            <div>
+              <h2>Excluir projeto</h2>
+              <p className="muted small">
+                Remove definitivamente conjuntos, registros, histórico e vínculos deste projeto.
+                Exporte antes, se precisar guardar os dados.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="danger"
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    `Excluir o projeto “${project.data?.name}” e todos os seus registros? Esta ação não pode ser desfeita.`,
+                  )
+                )
+                  return;
+                setDeleteError(null);
+                try {
+                  await api(`/projects/${projectId}`, { method: 'DELETE' });
+                  await cache.invalidateQueries({ queryKey: ['projects'] });
+                  navigate('/', { replace: true });
+                } catch (e) {
+                  setDeleteError(e);
+                }
+              }}
+            >
+              Excluir projeto
+            </button>
+          </div>
+          <ErrorNotice error={deleteError} />
+        </section>
+      )}
     </>
   );
 }

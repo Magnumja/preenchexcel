@@ -55,7 +55,7 @@ it('sincroniza com o link: aplica novidades, preserva edições locais e para se
     .update(datasets)
     .set({
       sourceUrl: 'https://docs.google.com/spreadsheets/d/1234567890abcdefghijklmnopqrst/edit',
-      syncMapping: syncMappingFor(mapping, ds),
+      syncMapping: syncMappingFor({ ...mapping, name: 'Renomeado' }, ds, 'clientes'),
       syncState: { userId },
     })
     .where(eq(datasets.id, ds));

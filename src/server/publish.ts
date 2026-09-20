@@ -53,7 +53,7 @@ export async function publish(userId: string, batchId: string, config: Confirmat
           .update(datasets)
           .set({
             sourceUrl: locked.sourceUrl,
-            syncMapping: syncMappingFor(p.mapping, p.existing!.id),
+            syncMapping: syncMappingFor(p.mapping, p.existing!.id, p.sheet.name),
             syncState: { ...(p.existing as { syncState?: { userId: string } }).syncState, userId },
           })
           .where(eq(datasets.id, p.existing!.id));
@@ -87,7 +87,7 @@ export async function publish(userId: string, batchId: string, config: Confirmat
         titleField: p.mapping.titleField,
         sourceUrl: locked.sourceUrl,
         syncMapping: locked.sourceUrl
-          ? syncMappingFor(p.mapping, datasetIds.get(p.mapping.sheetId)!)
+          ? syncMappingFor(p.mapping, datasetIds.get(p.mapping.sheetId)!, p.sheet.name)
           : null,
         syncState: locked.sourceUrl ? { userId } : null,
       });

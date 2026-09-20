@@ -47,13 +47,19 @@ export function proposeMapping(sheet: Sheet, headerRow?: number): Mapping {
     const readonly = column.some((c) => c?.formula !== undefined);
     // Identifiers remain textual. Only native Excel scalar types are inferred.
     const identifier = /(^id$|cód|cod|cpf|cnpj|cep|telefone|matrícula)/i.test(source);
+    // Datas só quando já vieram como data do Excel (ISO); texto “dd/mm/aaaa” exige revisão.
     const type = identifier
       ? 'text'
       : values.length && values.every((c) => typeof c?.value === 'number')
         ? 'number'
         : values.length && values.every((c) => typeof c?.value === 'boolean')
           ? 'boolean'
-          : 'text';
+          : values.length &&
+              values.every(
+                (c) => typeof c?.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.value),
+              )
+            ? 'date'
+            : 'text';
     return {
       id: `c${i + 1}`,
       source,

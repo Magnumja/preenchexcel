@@ -9,16 +9,18 @@ import type { Mapping, ReconcilePlan, SyncState } from '../shared/contracts';
 const normalize = (v: unknown) =>
   String(v ?? '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
 /**
  * Mapeamento que a sincronização vai reutilizar: a mesma aba, as mesmas colunas → campos. Para um
  * conjunto recém-criado, cada coluna alimenta o campo de mesmo id.
  */
-export function syncMappingFor(mapping: Mapping, datasetId: string): Mapping {
+export function syncMappingFor(mapping: Mapping, datasetId: string, sheetName: string): Mapping {
   return {
     ...mapping,
+    // `name` aqui é o nome ORIGINAL da aba: é por ele que a sincronização a reencontra.
+    name: sheetName,
     datasetId,
     conflicts: 'keep',
     fields: mapping.fields.map((f) => ({ ...f, target: f.target ?? f.id })),
