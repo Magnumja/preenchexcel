@@ -18,6 +18,7 @@ import type {
   DataRecord,
   Mapping,
   SyncState,
+  RevisionAction,
 } from '../shared/contracts';
 const time = (name: string) => timestamp(name, { withTimezone: true }).notNull().defaultNow();
 export const user = pgTable('app_user', {
@@ -130,6 +131,8 @@ export const records = pgTable(
     externalKey: text('external_key'),
     version: integer().notNull().default(1),
     source: jsonb().$type<DataRecord['source']>().notNull(),
+    // Exclusão lógica: o registro some das listas e exportações, mas mantém histórico e pode voltar.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     updatedAt: time('updated_at'),
     updatedBy: text('updated_by')
       .notNull()
@@ -138,6 +141,7 @@ export const records = pgTable(
   (t) => [
     index('record_dataset').on(t.datasetId),
     uniqueIndex('record_external_key').on(t.datasetId, t.externalKey),
+    index('record_dataset_active').on(t.datasetId, t.deletedAt),
   ],
 );
 export const links = pgTable(
@@ -166,6 +170,7 @@ export const revisions = pgTable(
     version: integer().notNull(),
     before: jsonb().$type<Record<string, Value> | null>(),
     after: jsonb().$type<Record<string, Value>>().notNull(),
+    action: text().$type<RevisionAction>().notNull().default('edit'),
     createdAt: time('created_at'),
   },
   (t) => [index('revision_record').on(t.recordId)],

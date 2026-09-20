@@ -62,6 +62,19 @@ test('conta → CSV → revisão → edição → recarga → exportação e lay
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Fábio Nunes');
   await page.getByLabel('Caminho').getByRole('link', { name: 'clientes', exact: true }).click();
   await expect(page.getByText('6 registros', { exact: true })).toBeVisible();
+  // Exclusão lógica e restauração pela ficha.
+  await page.getByRole('link', { name: 'Fábio Nunes', exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Excluir', exact: true }).click();
+  await expect(page.getByText(/Registro excluído em/)).toBeVisible();
+  await page.getByLabel('Caminho').getByRole('link', { name: 'clientes', exact: true }).click();
+  await expect(page.getByText('5 registros', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Ver excluídos (1)' }).click();
+  await page.getByRole('link', { name: 'Fábio Nunes', exact: true }).click();
+  await page.getByRole('button', { name: 'Restaurar registro' }).click();
+  await expect(page.getByText(/Registro excluído em/)).toHaveCount(0);
+  await page.getByLabel('Caminho').getByRole('link', { name: 'clientes', exact: true }).click();
+  await expect(page.getByText('6 registros', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Colunas' }).click();
   await page.getByLabel('E-mail', { exact: true }).uncheck();
   await expect(page.getByRole('columnheader', { name: 'E-mail' })).toHaveCount(0);

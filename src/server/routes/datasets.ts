@@ -1,6 +1,6 @@
 import express from 'express';
 import { z } from 'zod';
-import { and, eq, desc, asc, sql, inArray } from 'drizzle-orm';
+import { and, eq, desc, asc, sql, inArray, isNull, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
 import { datasets, records } from '../schema';
 import { datasetAccess } from '../access';
@@ -15,7 +15,7 @@ router.get('/api/datasets/:id', async (req, res) => {
   const [count] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(records)
-    .where(eq(records.datasetId, d.id));
+    .where(and(eq(records.datasetId, d.id), isNull(records.deletedAt)));
   res.json({ ...publicDataset(d), recordCount: count.total });
 });
 router.patch('/api/datasets/:id', async (req, res) => {
@@ -97,9 +97,13 @@ router.get('/api/datasets/:id/records', async (req, res) => {
       filterField: z.string().default(''),
       filterValue: z.string().max(500).default(''),
       filterMode: z.enum(['exact', 'contains']).default('exact'),
+      deleted: z.enum(['0', '1']).default('0'),
     })
     .parse(req.query);
-  const conditions = [eq(records.datasetId, dataset.id)];
+  const conditions = [
+    eq(records.datasetId, dataset.id),
+    q.deleted === '1' ? isNotNull(records.deletedAt) : isNull(records.deletedAt),
+  ];
   if (q.q)
     conditions.push(
       sql`exists (select 1 from jsonb_each_text(${records.values}) as v where position(lower(${q.q}) in lower(v.value))>0)`,
@@ -120,10 +124,14 @@ router.get('/api/datasets/:id/records', async (req, res) => {
     : sql`${records.values}->>${field.id}`;
   const where = and(...conditions),
     order = q.direction === 'desc' ? desc(expression) : asc(expression);
+  // Uma consulta para os dois totais: o filtrado e o de excluídos (independente dos filtros).
   const [count] = await db
-    .select({ total: sql<number>`count(*)::int` })
+    .select({
+      total: sql<number>`count(*) filter (where ${where})::int`,
+      trash: sql<number>`count(*) filter (where ${records.deletedAt} is not null)::int`,
+    })
     .from(records)
-    .where(where);
+    .where(eq(records.datasetId, dataset.id));
   const items = await db
     .select()
     .from(records)
@@ -149,14 +157,21 @@ router.get('/api/datasets/:id/records', async (req, res) => {
       .where(inArray(records.id, ids));
     for (const t of targets) references[t.id] = String(t.values[t.titleField] ?? '');
   }
-  res.json({ items, total: count.total, page: q.page, pageSize: 25, references });
+  res.json({
+    items,
+    total: count.total,
+    page: q.page,
+    pageSize: 25,
+    references,
+    deletedCount: count.trash,
+  });
 });
 router.get('/api/datasets/:id/export', async (req, res) => {
   const d = await datasetAccess(res.locals.user.id, uuid(req.params.id));
   const rows = await db
     .select()
     .from(records)
-    .where(eq(records.datasetId, d.id))
+    .where(and(eq(records.datasetId, d.id), isNull(records.deletedAt)))
     .orderBy(asc(records.externalKey), asc(records.id));
   const targets = new Map<string, string>();
   for (const f of d.fields.filter((f) => f.type === 'reference')) {

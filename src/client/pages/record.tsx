@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useBlocker, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { History, Save, LockKeyhole, Check, FileSpreadsheet, ExternalLink } from 'lucide-react';
+import {
+  History,
+  Save,
+  LockKeyhole,
+  Check,
+  FileSpreadsheet,
+  ExternalLink,
+  Trash2,
+  RotateCcw,
+} from 'lucide-react';
 import { api, display, formatValue } from '../api';
 import { ErrorNotice, Loading, Modal } from '../ui';
 import { useWorkspace, usePageContext } from '../shell';
@@ -12,6 +21,8 @@ export function RecordPage() {
   const query = useQuery({
     queryKey: ['record', recordId],
     queryFn: () => api<{ record: DataRecord; dataset: Dataset }>(`/records/${recordId}`),
+    // A ficha mantém estado próprio a partir da resposta; não reaproveitar cache antigo entre visitas.
+    gcTime: 0,
   });
   return (
     <>
@@ -190,12 +201,88 @@ function Editor({
           </div>
         </div>
         {!create && (
-          <button onClick={() => setHistory(true)}>
-            <History size={17} />
-            Histórico
-          </button>
+          <div className="row wrap">
+            <button onClick={() => setHistory(true)}>
+              <History size={17} />
+              Histórico
+            </button>
+            {canEdit && !record.deletedAt && (
+              <button
+                className="danger"
+                disabled={busy}
+                onClick={async () => {
+                  if (dirty && !window.confirm('Há alterações não salvas. Excluir mesmo assim?'))
+                    return;
+                  if (
+                    !dirty &&
+                    !window.confirm(`Excluir “${title}”? Você poderá restaurar depois.`)
+                  )
+                    return;
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    const removed = await api<DataRecord>(
+                      `/records/${record.id}?version=${record.version}`,
+                      { method: 'DELETE' },
+                    );
+                    setRecord(removed);
+                    setValues(removed.values);
+                    cache.setQueryData(['record', record.id], { record: removed, dataset });
+                    await cache.invalidateQueries({ queryKey: ['records'] });
+                    await cache.invalidateQueries({ queryKey: ['project', dataset.projectId] });
+                  } catch (e) {
+                    setError(e);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Trash2 size={17} />
+                Excluir
+              </button>
+            )}
+          </div>
         )}
       </div>
+      {record.deletedAt && (
+        <div className="notice warning">
+          <Trash2 size={18} />
+          <div>
+            Registro excluído em {new Date(record.deletedAt).toLocaleString('pt-BR')}. Ele não
+            aparece nas listas nem na exportação; o histórico foi preservado.
+            {canEdit && (
+              <p>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      const restored = await api<DataRecord>(`/records/${record.id}/restore`, {
+                        method: 'POST',
+                        body: JSON.stringify({ version: record.version }),
+                      });
+                      setRecord(restored);
+                      setValues(restored.values);
+                      cache.setQueryData(['record', record.id], { record: restored, dataset });
+                      await cache.invalidateQueries({ queryKey: ['records'] });
+                      await cache.invalidateQueries({ queryKey: ['project', dataset.projectId] });
+                    } catch (e) {
+                      setError(e);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <RotateCcw size={15} /> Restaurar registro
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {!canEdit && (
         <div className="notice">
           <LockKeyhole size={18} />
@@ -217,7 +304,7 @@ function Editor({
                     key={f.id}
                     field={f}
                     value={values[f.id] ?? null}
-                    disabled={!canEdit || busy}
+                    disabled={!canEdit || busy || !!record.deletedAt}
                     onChange={(v) => {
                       setValues({ ...values, [f.id]: v });
                       setSaved(false);
@@ -297,7 +384,7 @@ function Editor({
                 Descartar
               </button>
             )}
-            {canEdit && (
+            {canEdit && !record.deletedAt && (
               <button className="primary" disabled={!dirty || busy}>
                 <Save size={17} />
                 {busy ? 'Salvando…' : create ? 'Criar registro' : 'Salvar alterações'}
@@ -340,11 +427,19 @@ function HistoryList({ record, dataset }: { record: DataRecord; dataset: Dataset
         <ol className="history-list">
           {query.data?.map((r) => (
             <li key={r.id}>
-              <strong>{r.before ? `Alteração · versão ${r.version}` : 'Importação inicial'}</strong>
+              <strong>
+                {r.action === 'delete'
+                  ? `Exclusão · versão ${r.version}`
+                  : r.action === 'restore'
+                    ? `Restauração · versão ${r.version}`
+                    : r.before
+                      ? `${r.action === 'import' ? 'Atualização pelo arquivo' : 'Alteração'} · versão ${r.version}`
+                      : 'Importação inicial'}
+              </strong>
               <small>
                 {r.author} · {new Date(r.createdAt).toLocaleString('pt-BR')}
               </small>
-              {r.before ? (
+              {r.action === 'delete' || r.action === 'restore' ? null : r.before ? (
                 <dl>
                   {dataset.fields
                     .filter(

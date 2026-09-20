@@ -129,6 +129,28 @@ it('reimporta sobre um conjunto existente: inclui, atualiza, preserva edições 
     ['002', 'Dourados', 3],
     ['003', 'Bonito', 1],
   ]);
+  // Registro excluído no Preenche volta quando o arquivo traz a chave (sem contar como conflito).
+  const carla = items.find((r) => r.values.c1 === '003')!;
+  await a.delete(`/api/records/${carla.id}?version=${carla.version}`).set('Origin', origin);
+  const fourth = await upload('Código,Nome,Cidade\n003,Carla,Corumbá');
+  const m5 = fourth.diagnosis.mappings[0] as typeof m2;
+  m5.datasetId = ds;
+  m5.fields[0].target = 'c1';
+  m5.fields[1].target = 'c2';
+  m5.fields[2].target = 'c3';
+  const cfg5 = { ...config, mappings: [m5] };
+  const preview5 = await a
+    .post(`/api/imports/${fourth.id}/preview`)
+    .set('Origin', origin)
+    .send(cfg5);
+  expect(preview5.body[0].plan).toMatchObject({ inserts: 0, updates: 1, conflicts: [] });
+  expect(preview5.body[0].plan.missing).toEqual(['001', '002']);
+  expect(
+    (await a.post(`/api/imports/${fourth.id}/confirm`).set('Origin', origin).send(cfg5)).status,
+  ).toBe(200);
+  const back = (await a.get(`/api/records/${carla.id}`)).body.record;
+  expect(back.deletedAt).toBeNull();
+  expect(back.values.c3).toBe('Corumbá');
   const history = await a.get(`/api/records/${bruno.id}/history`);
   expect(history.body.map((h: { version: number }) => h.version)).toEqual([3, 2, 1]);
   // Conjunto de outro projeto é recusado.

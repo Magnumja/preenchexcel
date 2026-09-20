@@ -131,6 +131,7 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
     [filterValue, setFilterValue] = useState(''),
     [filters, setFilters] = useState(false),
     [columnPicker, setColumnPicker] = useState(false),
+    [showDeleted, setShowDeleted] = useState(false),
     [visibleIds, setVisibleIds] = useState(() => readColumns(dataset));
   const filterDef = dataset.fields.find((f) => f.id === filterField);
   const filterMode =
@@ -162,6 +163,7 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
     filterField,
     filterValue: filterField ? filterValue : '',
     filterMode,
+    deleted: showDeleted ? '1' : '0',
   });
   const query = useQuery({
     queryKey: ['records', dataset.id, params.toString()],
@@ -171,6 +173,7 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
         total: number;
         pageSize: number;
         references: Record<string, string>;
+        deletedCount: number;
       }>(`/datasets/${dataset.id}/records?${params}`),
   });
   const columns = [
@@ -187,9 +190,27 @@ function RecordList({ dataset, canEdit }: { dataset: Dataset; canEdit: boolean }
         <div>
           <h2>{dataset.name}</h2>
           <p className="muted">
-            {query.data
-              ? `${query.data.total.toLocaleString('pt-BR')} registro${query.data.total === 1 ? '' : 's'}${q || filterField ? ' encontrados' : ''}`
-              : '…'}
+            <span>
+              {query.data
+                ? `${query.data.total.toLocaleString('pt-BR')} registro${query.data.total === 1 ? '' : 's'}${showDeleted ? ' excluídos' : q || filterField ? ' encontrados' : ''}`
+                : '…'}
+            </span>
+            {query.data && (query.data.deletedCount > 0 || showDeleted) && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  className="text-button"
+                  aria-pressed={showDeleted}
+                  onClick={() => {
+                    setShowDeleted(!showDeleted);
+                    setPage(1);
+                  }}
+                >
+                  {showDeleted ? 'Voltar aos ativos' : `Ver excluídos (${query.data.deletedCount})`}
+                </button>
+              </>
+            )}
           </p>
         </div>
         <div className="row wrap">

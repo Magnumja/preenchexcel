@@ -89,6 +89,8 @@ export async function updateRecord(
   patch: Record<string, Value>,
 ) {
   const { record, dataset } = await recordAccess(userId, id, true);
+  if (record.deletedAt)
+    throw new AppError(422, 'Este registro está excluído. Restaure-o antes de editar.');
   const values = validateValues(patch, dataset.fields, record.values);
   checkKey(dataset, values);
   for (const f of dataset.fields.filter((f) => f.type === 'reference'))
@@ -125,6 +127,39 @@ export async function updateRecord(
       version: saved.version,
       before: record.values,
       after: values,
+      action: 'edit',
+    });
+    return saved;
+  });
+}
+/** Exclusão lógica ou restauração: versão nova e revisão própria; os valores não mudam. */
+export async function setDeleted(userId: string, id: string, version: number, deleted: boolean) {
+  const { record } = await recordAccess(userId, id, true);
+  if (!!record.deletedAt === deleted) return record;
+  return db.transaction(async (tx) => {
+    const [saved] = await tx
+      .update(records)
+      .set({
+        deletedAt: deleted ? new Date() : null,
+        version: sql`${records.version}+1`,
+        updatedAt: new Date(),
+        updatedBy: userId,
+      })
+      .where(and(eq(records.id, id), eq(records.version, version)))
+      .returning();
+    if (!saved)
+      throw new AppError(
+        409,
+        'Outra pessoa alterou este registro. Reabra a versão atual antes de continuar.',
+        'VERSION_CONFLICT',
+      );
+    await tx.insert(revisions).values({
+      recordId: id,
+      authorId: userId,
+      version: saved.version,
+      before: record.values,
+      after: record.values,
+      action: deleted ? 'delete' : 'restore',
     });
     return saved;
   });

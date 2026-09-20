@@ -57,4 +57,6 @@ tests/                    Vitest (API e conversão) e Playwright (tests/e2e)
 
 ## Produção
 
+Há um blueprint do Render em [render.yaml](render.yaml) (build, migração antes do deploy, health check e variáveis) e um [vercel.json](vercel.json) opcional para hospedar só o cliente na Vercel com rewrite de `/api` para o Render.
+
 Uma instância Node serve API e cliente estático (`npm run build && NODE_ENV=production npm start`). Variáveis necessárias: `DATABASE_URL` (TLS), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` e `APP_ORIGIN` iguais à URL pública, `PORT`. Mutações exigem cabeçalho `Origin` igual a `APP_ORIGIN`; respostas de `/api` são `no-store`. Se o cliente for hospedado em outro domínio (ex.: Vercel com rewrite de `/api` para Render), `APP_ORIGIN` deve ser o domínio do cliente e a autenticação deve ser testada nesse domínio antes de liberar acesso.

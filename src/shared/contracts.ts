@@ -128,6 +128,7 @@ export interface DataRecord {
   values: Record<string, Value>;
   version: number;
   updatedAt: string;
+  deletedAt?: string | null;
   source: {
     file: string;
     sheet: string;
@@ -159,11 +160,13 @@ export interface Workspace {
   name: string;
   role: 'owner' | 'editor' | 'viewer';
 }
+export type RevisionAction = 'import' | 'edit' | 'delete' | 'restore';
 export interface Revision {
   id: string;
   author: string;
   createdAt: string;
   version: number;
+  action: RevisionAction;
   before: Record<string, Value> | null;
   after: Record<string, Value>;
 }

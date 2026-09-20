@@ -169,6 +169,35 @@ it('isola espaços, publica sem duplicar e salva com histórico/concorrência', 
         .send({ url: 'https://docs.google.com/spreadsheets/d/1234567890abcdefghijklmnop/edit' })
     ).status,
   ).toBe(403);
+  // Exclusão lógica: some da lista e da exportação, bloqueia edição, restaura com histórico.
+  const current = (await a.get(`/api/records/${rec.id}`)).body.record.version as number;
+  const removed = await a.delete(`/api/records/${rec.id}?version=${current}`).set('Origin', origin);
+  expect(removed.status, removed.text).toBe(200);
+  expect(removed.body.deletedAt).toBeTruthy();
+  expect((await a.get(`/api/datasets/${ds}/records`)).body.total).toBe(2);
+  expect((await a.get(`/api/datasets/${ds}/records`)).body.deletedCount).toBe(1);
+  expect((await a.get(`/api/datasets/${ds}/records?deleted=1`)).body.items[0].id).toBe(rec.id);
+  expect((await a.get(`/api/datasets/${ds}/export`)).text).not.toContain('"001"');
+  expect(
+    (
+      await a
+        .patch(`/api/records/${rec.id}`)
+        .set('Origin', origin)
+        .send({ version: removed.body.version, values: { c2: 'X' } })
+    ).status,
+  ).toBe(422);
+  const restored = await a
+    .post(`/api/records/${rec.id}/restore`)
+    .set('Origin', origin)
+    .send({ version: removed.body.version });
+  expect(restored.status, restored.text).toBe(200);
+  expect(restored.body.deletedAt).toBeNull();
+  expect((await a.get(`/api/datasets/${ds}/records`)).body.total).toBe(3);
+  expect(
+    (await a.get(`/api/records/${rec.id}/history`)).body
+      .slice(0, 2)
+      .map((h: { action: string }) => h.action),
+  ).toEqual(['restore', 'delete']);
   // Remoção de membro: só proprietário; o próprio proprietário não sai.
   expect(
     (await b.delete(`/api/workspaces/${wid}/members/${bid}`).set('Origin', origin)).status,

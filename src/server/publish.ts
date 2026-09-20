@@ -128,6 +128,7 @@ export async function publish(userId: string, batchId: string, config: Confirmat
             version: 1,
             before: null,
             after: r.values,
+            action: 'import' as const,
           })),
         );
       }

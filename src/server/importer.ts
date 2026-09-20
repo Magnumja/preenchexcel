@@ -202,6 +202,7 @@ export async function parseFiles(
   }
   if (!sheets.length || sheets.length > 20 || sheets.reduce((n, s) => n + s.rows.length, 0) > 10020)
     throw new AppError(413, 'Use até 20 abas e 10 mil linhas por lote.');
+  const mappings: Mapping[] = [];
   for (const s of sheets) {
     if (!s.rows.length) s.rows = [[{ value: null }]];
     if (
@@ -230,10 +231,11 @@ export async function parseFiles(
       )
     )
       s.warnings.push('Datas textuais: escolha o tipo e confira a localidade antes de converter.');
+    mappings.push(m);
   }
   return {
     sheets,
-    mappings: sheets.map((s) => proposeMapping(s)),
+    mappings,
     warnings: [
       'Nenhuma aba será unida automaticamente. Resumos podem duplicar registros: escolha a fonte correta.',
       'Gráficos, tabelas dinâmicas, estilos e automações não são convertidos. Revise as regiões excluídas.',

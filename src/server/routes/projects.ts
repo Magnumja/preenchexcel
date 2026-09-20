@@ -15,7 +15,7 @@ router.get('/api/workspaces/:wid/projects', async (req, res) => {
       .select({
         ...getTableColumns(projects),
         datasetCount: sql<number>`(select count(*)::int from dataset where project_id=project.id)`,
-        recordCount: sql<number>`(select count(*)::int from record r join dataset d on r.dataset_id=d.id where d.project_id=project.id)`,
+        recordCount: sql<number>`(select count(*)::int from record r join dataset d on r.dataset_id=d.id where d.project_id=project.id and r.deleted_at is null)`,
       })
       .from(projects)
       .where(eq(projects.workspaceId, wid))
@@ -32,7 +32,7 @@ router.get('/api/projects/:id', async (req, res) => {
   const sets = await db
     .select({
       ...getTableColumns(datasets),
-      recordCount: sql<number>`(select count(*)::int from record where dataset_id=dataset.id)`,
+      recordCount: sql<number>`(select count(*)::int from record where dataset_id=dataset.id and deleted_at is null)`,
     })
     .from(datasets)
     .where(eq(datasets.projectId, p.id));

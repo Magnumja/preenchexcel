@@ -1,10 +1,21 @@
 import express from 'express';
+import compression from 'compression';
 import { resolve } from 'node:path';
 import { app } from './app';
 import { pool } from './db';
 import { startSyncScheduler } from './sync';
+app.use(compression());
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(resolve('dist/client')));
+  // Assets com hash no nome podem ficar em cache por muito tempo; o index.html não.
+  app.use(
+    express.static(resolve('dist/client'), {
+      index: false,
+      setHeaders: (res, path) => {
+        if (path.includes('/assets/'))
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+    }),
+  );
   app.get('/{*path}', (_req, res) => res.sendFile(resolve('dist/client/index.html')));
 }
 const syncMinutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? 15);

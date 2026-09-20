@@ -65,12 +65,13 @@ export async function planReconcile(
     }
     const values = { ...record.values };
     for (const f of targeted) values[f.id] = row.values[f.id] ?? null;
-    if (JSON.stringify(values) === JSON.stringify(record.values)) {
+    if (!record.deletedAt && JSON.stringify(values) === JSON.stringify(record.values)) {
       result.plan.unchanged++;
       continue;
     }
     // Editado no Preenche depois da última importação: o arquivo só sobrescreve se a pessoa pedir.
-    const edited = record.version > (record.source.importedVersion ?? 1);
+    // Um registro excluído volta quando o arquivo traz sua chave (é atualização, não conflito).
+    const edited = !record.deletedAt && record.version > (record.source.importedVersion ?? 1);
     if (edited) {
       result.conflicts.push({ record, row, values });
       result.plan.conflicts.push(key);
@@ -80,7 +81,8 @@ export async function planReconcile(
     }
   }
   for (const r of existing)
-    if (!seen.has(r.externalKey ?? '')) result.plan.missing.push(r.externalKey ?? r.id);
+    if (!r.deletedAt && !seen.has(r.externalKey ?? ''))
+      result.plan.missing.push(r.externalKey ?? r.id);
   return result;
 }
 /** Troca chaves externas de referência pelos ids internos dos registros de destino. */
@@ -166,6 +168,7 @@ export async function applyReconcile(
         version: 1,
         before: null,
         after: r.values,
+        action: 'import' as const,
       })),
     );
     await insertLinks(tx, referenceFields, chunk);
@@ -177,6 +180,7 @@ export async function applyReconcile(
       .update(records)
       .set({
         values,
+        deletedAt: null,
         version: sql`${records.version}+1`,
         updatedAt: new Date(),
         updatedBy: userId,
@@ -204,6 +208,7 @@ export async function applyReconcile(
       version: saved.version,
       before: record.values,
       after: values,
+      action: 'import',
     });
     for (const f of referenceFields)
       await tx.delete(links).where(and(eq(links.recordId, record.id), eq(links.fieldId, f.id)));

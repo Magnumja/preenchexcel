@@ -14,14 +14,16 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
+    "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:seed": "tsx --env-file=.env scripts/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.103.1",
+    "@types/compression": "^1.8.1",
     "better-auth": "^1.7.5",
+    "compression": "^1.8.2",
     "csv-parse": "^7.0.2",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
